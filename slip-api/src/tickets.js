@@ -37,6 +37,14 @@ function isValidDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
 }
 
+/** 服务器本地日期 YYYY-MM-DD（店铺按本地时间营业） */
+function localDateString(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 // 新建工单：放下鞋时填描述、毛病、预估取件日，吐出四位码
 ticketsRouter.post('/', async (req, res, next) => {
   try {
@@ -52,8 +60,13 @@ ticketsRouter.post('/', async (req, res, next) => {
     if (description.length > 200 || problem.length > 500) {
       return res.status(400).json({ error: '填写内容过长' });
     }
-    if (expectedPickup && !isValidDate(expectedPickup)) {
-      return res.status(400).json({ error: '预估取件日格式应为 YYYY-MM-DD' });
+    if (expectedPickup) {
+      if (!isValidDate(expectedPickup)) {
+        return res.status(400).json({ error: '预估取件日格式应为 YYYY-MM-DD' });
+      }
+      if (expectedPickup < localDateString(new Date())) {
+        return res.status(400).json({ error: '预估取件日不能早于今天' });
+      }
     }
 
     // 边发码边插入：若撞上并发登记（唯一索引 23505），换码重试
@@ -77,17 +90,48 @@ ticketsRouter.post('/', async (req, res, next) => {
   }
 });
 
-// 工单列表，可取的排最前，其余按收鞋时间倒序；可用 ?status= 过滤
+// 工单列表：后端按状态/四位码过滤并分页；可取的排最前，其余按收鞋时间倒序
+// 查询参数：status、q（按码模糊搜）、page（从 1 起）、pageSize（1-100）
 ticketsRouter.get('/', async (req, res, next) => {
   try {
-    const filter = STATUSES.includes(req.query.status) ? req.query.status : null;
+    const status = STATUSES.includes(req.query.status) ? req.query.status : null;
+    const q = String(req.query.q ?? '').trim();
+    if (q && !/^\d{1,4}$/.test(q)) {
+      return res.status(400).json({ error: '取件码只能是数字' });
+    }
+
+    let page = Number.parseInt(req.query.page, 10);
+    let pageSize = Number.parseInt(req.query.pageSize, 10);
+    if (!Number.isFinite(page) || page < 1) page = 1;
+    if (!Number.isFinite(pageSize) || pageSize < 1) pageSize = 20;
+    if (pageSize > 100) pageSize = 100;
+
+    const conditions = ['($1::text IS NULL OR status = $1)', '($2::text IS NULL OR code LIKE $2)'];
+    const params = [status, q ? `${q}%` : null];
+
+    const countSql = `SELECT count(*)::int AS total FROM tickets WHERE ${conditions.join(' AND ')}`;
+    const { rows: countRows } = await pool.query(countSql, params);
+    const total = countRows[0].total;
+
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (page > totalPages) page = totalPages;
+    const offset = (page - 1) * pageSize;
+
     const { rows } = await pool.query(
       `SELECT * FROM tickets
-       WHERE ($1::text IS NULL OR status = $1)
-       ORDER BY (status = 'ready') DESC, created_at DESC`,
-      [filter],
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY (status = 'ready') DESC, created_at DESC
+       LIMIT $3 OFFSET $4`,
+      [...params, pageSize, offset],
     );
-    res.json(rows.map(toTicket));
+
+    res.json({
+      items: rows.map(toTicket),
+      page,
+      pageSize,
+      total,
+      totalPages,
+    });
   } catch (err) {
     next(err);
   }
@@ -144,10 +188,14 @@ ticketsRouter.patch('/:code/status', async (req, res, next) => {
       const current = rows[0];
       const fromIdx = STATUSES.indexOf(current.status);
       const toIdx = STATUSES.indexOf(nextStatus);
-      if (toIdx <= fromIdx) {
+      // 只允许改成紧挨着的下一个状态，不允许跳步或倒退
+      if (toIdx !== fromIdx + 1) {
         await client.query('ROLLBACK');
+        const expected = STATUS_LABELS[STATUSES[fromIdx + 1]];
         return res.status(409).json({
-          error: `当前为「${STATUS_LABELS[current.status]}」，只能改成后面的状态`,
+          error: expected
+            ? `当前为「${STATUS_LABELS[current.status]}」，只能先改成「${expected}」`
+            : '该单已取走，不能再改状态',
         });
       }
 

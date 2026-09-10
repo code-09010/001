@@ -347,3 +347,21 @@ textarea:focus {
   text-align: center;
   padding: 30px 0;
 }
+
+/* 分页 */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.page-info {
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 150px;
+  text-align: center;
+}

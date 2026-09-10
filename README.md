@@ -45,10 +45,10 @@ npm run dev
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| `POST` | `/api/tickets` | 新建工单，body：`{description, problem?, expectedPickup?}`，返回含 `code` |
-| `GET` | `/api/tickets` | 工单列表（可取优先），可 `?status=received\|repairing\|ready\|picked_up` |
+| `POST` | `/api/tickets` | 新建工单，body：`{description, problem?, expectedPickup?}`（取件日不得早于今天），返回含 `code` |
+| `GET` | `/api/tickets` | 分页列表（可取优先），参数：`status`、`q`（按四位码前缀搜）、`page`（从 1 起）、`pageSize`（默认 20，最大 100），返回 `{items, page, pageSize, total, totalPages}` |
 | `GET` | `/api/tickets/:code` | 按四位码查单 |
-| `PATCH` | `/api/tickets/:code/status` | 推进状态，body：`{status}`，只能沿流程往前走 |
+| `PATCH` | `/api/tickets/:code/status` | 推进到**相邻的下一个**状态（已收→修补中→可取→已取走，不可跳步/倒退），body：`{status}` |
 
 四位码在「未取走」的工单中唯一（数据库约束保证）；客人取走后该码可重新发给新客人。
 

@@ -74,3 +74,4 @@ temp/
 *.tmp
 *.swp
 *.swo
+.claude

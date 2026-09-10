@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cobbler-postgres
+    environment:
+      POSTGRES_DB: cobbler
+      POSTGRES_USER: cobbler
+      POSTGRES_PASSWORD: cobbler
+    ports:
+      # 方便本机排查；只想容器间访问可删掉这行
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cobbler -d cobbler"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  slip-api:
+    build: ./slip-api
+    container_name: cobbler-slip-api
+    depends_on:
+      postgres:
+        # 等 Postgres 健康检查通过后再挂接口
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: cobbler
+      PGUSER: cobbler
+      PGPASSWORD: cobbler
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  pgdata:

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>修鞋取件 · 店员页</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>修鞋取件单</h1>
+      <span class="subtitle">收鞋登记 · 进度跟进 · 凭码取鞋</span>
+    </header>
+
+    <main class="layout">
+      <!-- 左：收鞋登记 -->
+      <section class="card">
+        <h2>收下这双鞋</h2>
+        <form id="create-form">
+          <label>
+            鞋子描述 <span class="req">*</span>
+            <textarea
+              id="description"
+              rows="2"
+              maxlength="200"
+              placeholder="例如：黑色男士皮鞋 42 码，左脚一只"
+              required
+            ></textarea>
+          </label>
+          <label>
+            毛病
+            <textarea
+              id="problem"
+              rows="3"
+              maxlength="500"
+              placeholder="例如：鞋底开胶，后跟磨偏"
+            ></textarea>
+          </label>
+          <label>
+            预估取件日
+            <input id="expected-pickup" type="date" />
+          </label>
+          <button type="submit" class="btn primary">登记并出码</button>
+          <p id="create-error" class="error" hidden></p>
+        </form>
+
+        <!-- 出码条：客人取鞋凭证 -->
+        <div id="slip" class="slip" hidden>
+          <p class="slip-tip">请把号码条交给客人，取鞋凭此码</p>
+          <div id="slip-code" class="slip-code">----</div>
+          <p id="slip-meta" class="slip-meta"></p>
+          <button type="button" id="slip-close" class="btn ghost">收下一双</button>
+        </div>
+      </section>
+
+      <!-- 右：工单列表 -->
+      <section class="card grow">
+        <div class="list-head">
+          <h2>在架工单</h2>
+          <input id="search" type="search" inputmode="numeric" placeholder="按四位码查" />
+        </div>
+        <nav class="filters" id="filters">
+          <button data-status="" class="chip active">全部</button>
+          <button data-status="received" class="chip">已收</button>
+          <button data-status="repairing" class="chip">修补中</button>
+          <button data-status="ready" class="chip">可取</button>
+          <button data-status="picked_up" class="chip">已取走</button>
+        </nav>
+        <div id="ticket-list" class="ticket-list">
+          <p class="hint" id="list-hint">加载中…</p>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
